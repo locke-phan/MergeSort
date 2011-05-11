@@ -3,10 +3,12 @@
 #include <stdlib.h> // for malloc
 #include <string.h> // for strerror
 #include <math.h>
+#include <time.h>
 
 #include <pthread.h>
 #include <dispatch/dispatch.h>
 
+int SIZE = 100000000;
 
 void mergeSort( int * , int , int );
 void merge( int * , int , int , int );
@@ -23,22 +25,65 @@ typedef struct _ms_thread_data {
 	int r;
 } ms_thread_data;
 
-int main (int argc, const char * argv[])
-{
-	int SIZE = 5000;
-	int NUM_THREADS = 2;
-	
-	int *A = malloc(sizeof(int)*(SIZE));
-	if ( A == NULL ) exit(EXIT_FAILURE);
-	
+void reset (int *A) {
 	int i, j;
 	j = SIZE;
 	for (i = 0; i < SIZE; i++,j--)
 		A[i] = j;
+}
+
+enum METHOD {
+	DISPATCH,
+	PTHREAD
+};
+
+void printUsage(const char * program_name) {
+	printf("Usage: %s [option] [numthread]\n"
+			"[option]: pthread or dispatch\n"
+			"[numthread]: number of threads/blocks (should be > 0).\n", program_name);
+}
+
+int main (int argc, const char * argv[])
+{	
+	if (argc <= 1) { 
+		printUsage(argv[0]);
+		return 0;
+	}
 	
-	//mergeSort_pThread( A, NUM_THREADS, SIZE );
-	//mergeSort(A, 0, SIZE - 1);
-	mergeSort_dispatch(A, NUM_THREADS, SIZE);
+	enum METHOD method;
+	if (strcmp(argv[1], "dispatch") == 0) {
+		method = DISPATCH;
+	} else if (strcmp(argv[1], "pthread") == 0)  {
+		method = PTHREAD;
+	} else {
+		printUsage(argv[0]);
+		return 0;
+	}
+	
+	int NUM_THREADS;
+	NUM_THREADS = atoi(argv[2]);
+	if (NUM_THREADS <= 0) {
+		printUsage(argv[0]);
+		return 0;
+	}
+	
+	int *A = malloc(sizeof(int)*(SIZE));
+	int i;
+	clock_t time1, time2;
+	if ( A == NULL ) exit(EXIT_FAILURE);
+	
+	reset(A);
+	
+	switch (method) {
+		case DISPATCH:
+			mergeSort_dispatch( A, NUM_THREADS, SIZE );
+			break;
+		case PTHREAD:
+			mergeSort_pThread( A, NUM_THREADS, SIZE );
+			break;
+		default:
+			break;
+	}
 	
 	if ( SIZE < 10000 )
 		for(i = 0; i < SIZE; i++)
@@ -46,21 +91,17 @@ int main (int argc, const char * argv[])
 	
 	printf("\n");
     
-	free(A);
-    
+	free(A);    
 	return 0;
 }
 
 
 void mergeSort_dispatch( int *A, int NUM_BLOCK, int N ) {
-	
     int size_per_block = N / NUM_BLOCK;
-	
 	int from = 0;
 	int i, j;
     
     dispatch_queue_t global_queue = dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0);
-    
     // Divide and Conquer
     dispatch_group_t merge_group = dispatch_group_create();
 	for (i = 0; i < NUM_BLOCK; i++) {
@@ -104,7 +145,6 @@ void mergeSort( int *A , int p , int r ) {
 }
 
 void mergeSort_pThread( int *A, int NUM_THREADS, int N ) {
-	
 	pthread_t threads[NUM_THREADS];
 	ms_thread_data data_per_thread[NUM_THREADS];
 	
@@ -140,17 +180,14 @@ void mergeSort_pThread( int *A, int NUM_THREADS, int N ) {
 	int NUMBER_OF_MERGE_THREADS = NUM_THREADS / 2;
 	
 	for (i = 0; i < number_of_merge_times; i++) {
-		
 		pthread_t merge_threads[NUMBER_OF_MERGE_THREADS];
-		
 		size_per_thread = N / NUMBER_OF_MERGE_THREADS;
 		
 		int error;
 		from = 0;
-		for (j = 0; j < NUMBER_OF_MERGE_THREADS; j++) {
-			
+		for (j = 0; j < NUMBER_OF_MERGE_THREADS; j++) {			
 			int to = (size_per_thread * (j + 1))-1; 
-			
+
             ms_thread_data *arguments = malloc(sizeof(ms_thread_data));
             arguments->A = A;
 			arguments->p = from;
@@ -166,10 +203,8 @@ void mergeSort_pThread( int *A, int NUM_THREADS, int N ) {
 				fprintf(stderr, "Error %d: %s.\n", error, strerror(error));
 				exit(EXIT_FAILURE);
 			}
-			
 			from = to + 1;
 		}
-		
 		int z;
 		for (z = 0; z < NUMBER_OF_MERGE_THREADS; z++) {
 			if ((error = pthread_join(merge_threads[z], NULL)) != 0)

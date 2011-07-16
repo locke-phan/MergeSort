@@ -149,7 +149,6 @@ void mergeSort_pThread( int *A, int NUM_THREADS, int N ) {
 	ms_thread_data data_per_thread[NUM_THREADS];
 	
 	int size_per_thread = N / NUM_THREADS;
-	
 	int from = 0;
 	int i, j;
 	for (i = 0; i < NUM_THREADS; i++) {
@@ -157,7 +156,6 @@ void mergeSort_pThread( int *A, int NUM_THREADS, int N ) {
 		int to = (size_per_thread * (i + 1))-1; 
 		
 		ms_thread_data *arg = &data_per_thread[i];
-		
 		arg->A = A;
 		arg->p = from;
 		arg->r = to;
